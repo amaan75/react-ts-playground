@@ -25,19 +25,9 @@ export default class App extends React.Component<AppProps, AppState> {
     this.onChange = this.onChange.bind(this);
     this.onPlayHandler = this.onPlayHandler.bind(this);
   }
-  componentDidMount() {
+  componentDidMount() {}
 
-
-  }
-
-  componentDidUpdate(pp: AppProps, ps: AppState) {
-    let url = "https://dclxh76xq5daf.cloudfront.net/cacargroup_5/index.m3u8?Policy=eyJTdGF0ZW1lbnQiOiBbeyJSZXNvdXJjZSI6Imh0dHBzOi8vZGNseGg3NnhxNWRhZi5jbG91ZGZyb250Lm5ldC9jYWNhcmdyb3VwXzUvKiIsIkNvbmRpdGlvbiI6eyJEYXRlTGVzc1RoYW4iOnsiQVdTOkVwb2NoVGltZSI6MTY4NTk4NzAwOX19fV19&Signature=b3iehOJVaSmCL2MpxUI2CdSeyzNtcPupXa96aqen091eydChhr6XAfdJIOrjaqGCLaYGa8JrKK5~v3fwWiTqI4vFY7yoijjECaw48n5o5ZTP7uGtlMehSX0RowVA5HzZ6pgS2RHma8BI0gNg0IT5xpR6S7HCOsEpnPvKjKgmiHnH3uO7q7aYWP3Vq6YX6ZJZtoA58EHePrvO21Eq3y9A5grAtEIRROM54Jl1Jtke8JsY8GFgjgMq8XA6yPHbe-yo9eI3vr6FvOEZHgwGOv2Slc~cz~4prTRYmBYAYPPGAIkNcVBTBLS4QUS7~3flJ310dKAvZ0ubaT1fMhhx2wsnCw__&Key-Pair-Id=K2L6HYL3JA1IDE";
-    if (ps.urlToPlay !== this.state.urlToPlay) {
-      let { url, params } = this.computeUrlAndParams(this.state.urlToPlay);
-      // console.log(`${url} and ${params}`)
-      this.playVideo(params, url);
-    }
-  }
+  componentDidUpdate(pp: AppProps, ps: AppState) {}
 
 
   private computeUrlAndParams(videoUrl: string): UrlAndParams {
@@ -64,12 +54,8 @@ export default class App extends React.Component<AppProps, AppState> {
     }
   }
   onPlayHandler(event: MouseEvent<HTMLButtonElement>) {
-    this.setState((ps: AppState) => {
-      return {
-        ...ps,
-        urlToPlay: ps.url
-      }
-    })
+    let { url, params } = this.computeUrlAndParams(this.state.url);
+    this.playVideo(params, url);
   }
 
   onChange(event: ChangeEvent<HTMLInputElement>) {
