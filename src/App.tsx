@@ -1,66 +1,131 @@
 import React, { ChangeEvent, MouseEvent } from 'react';
 import logo from './logo.svg';
 import './App.css';
-import Hls from 'hls.js';
+import axios, { AxiosResponse } from "axios";
+import { RequestOperator, SearchRequestType } from "./types/request_type"
+import { FormField } from './form_label_field';
+import { PrinterSeachResponseType, PrintJobSearchResponeType, TekionResponseType } from './types/repsonse_types';
 
 interface AppProps {
 
 }
 
-interface UrlAndParams {
-  url: string,
-  params: string
+type PrinterStatsTypeByPageCount = {
+  [pageCount: number]: PrinterStatsType
 }
+type PrinterStatsType = {
+  pageCount: number,
+  totalPages: number,
+  totalTimeTaken: number,
+  averageTimeTaken: number,
+  count: number,
+  displayName: string
+}
+
+
 interface AppState {
-  url: string,
-  urlToPlay: string
+  tenantId: string,
+  tekionApiToken: string,
+  dealerId: string,
+
 }
 export default class App extends React.Component<AppProps, AppState> {
   constructor(props: any) {
     super(props);
     this.state = {
-      url: "",
-      urlToPlay: ""
+      tenantId: "",
+      dealerId: "",
+      tekionApiToken: ""
     };
-    this.onChange = this.onChange.bind(this);
-    this.onPlayHandler = this.onPlayHandler.bind(this);
+    this.onClickHandler = this.onClickHandler.bind(this);
+    this.onChangeHandler = this.onChangeHandler.bind(this);
   }
-  componentDidMount() {}
+  componentDidMount() { }
 
-  componentDidUpdate(pp: AppProps, ps: AppState) {}
+  componentDidUpdate(pp: AppProps, ps: AppState) { }
 
 
-  private computeUrlAndParams(videoUrl: string): UrlAndParams {
-    let index = videoUrl.indexOf('?');
-    let url = videoUrl.substring(0, index);
-    let params = videoUrl.substring(index);
-    return { url, params };
-  }
-  private playVideo(params: string, url: string) {
-    let videoRef = document.getElementById('videotest') as HTMLMediaElement;
-    if (Hls.isSupported()) {
-      var hls = new Hls({
-        debug: true, xhrSetup: (xhr: XMLHttpRequest, url: string) => {
-          url = `${url}${params}`;
-          xhr.open('GET', url);
+
+  onClickHandler(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    const isDealerId = this.state.dealerId;
+    const searchRequest: SearchRequestType = {
+      filters: [{ "field": "tenantId", "operator": RequestOperator.IN, "values": [this.state.tenantId] },
+       {
+        "field": "dealerId", operator: RequestOperator.IN, values: [this.state.dealerId]
+      }],
+      pageInfo: {
+        start: 0,
+        rows: 200
+      }
+    };
+    const responsePromise = axios.post("https://app.tekioncloud.com/api/printer-mgmt/u/print-jobs/v2/search", searchRequest,
+      {
+        headers: {
+          "tekion-api-token": this.state.tekionApiToken ,
+          "dealerId": "4",
+          "tenantName": "techmotors",
+          "roleId": "4_SuperAdmin",
+          "clientId": "console",
+          "userId": "-1"
         }
-      });
-      hls.loadSource(url);
-      hls.attachMedia(videoRef);
-      hls.on(Hls.Events.MEDIA_ATTACHED, function () {
-        videoRef.muted = false;
-        videoRef.play();
-      });
-    }
-  }
-  onPlayHandler(event: MouseEvent<HTMLButtonElement>) {
-    let { url, params } = this.computeUrlAndParams(this.state.url);
-    this.playVideo(params, url);
+      }
+    );
+    // const searchResponse:TekionResponseType<SearchResponseType<PrintJobSearchResponeType>> =
+    responsePromise.then((res: AxiosResponse<TekionResponseType<PrinterSeachResponseType<PrintJobSearchResponeType>>, any>) => {
+      const hits = res.data.data.hits;
+      console.log("result from " + res.data.data.extra);
+      let resultMap: {
+        [key: string]: PrinterStatsTypeByPageCount
+      } = {};
+      hits.filter(el => el.status === "COMPLETED")
+        .forEach((el: PrintJobSearchResponeType, index: number) => {
+          const currentPrintTimeTaken = el.timeTaken;
+          const currentPageCount = el.totalPages;
+          const currentSinglePagePrintAverage = currentPrintTimeTaken / currentPageCount;
+          const printerStats = resultMap[el.printerName] || {};
+          const printerStatsForPageTotalAndPrinter = printerStats[el.totalPages] || {};
+          const computedOverallAverageForPageAndPrinter = printerStatsForPageTotalAndPrinter.averageTimeTaken || 0;
+          const sumOfAverage = currentSinglePagePrintAverage + computedOverallAverageForPageAndPrinter;
+          const currentCounter = printerStatsForPageTotalAndPrinter.count || 0;
+          const counterToUse = currentCounter + 1;
+          const newComputedAverage = sumOfAverage / counterToUse;
+          const totalPages = (printerStatsForPageTotalAndPrinter.totalPages || 0) + el.totalPages;
+          const totalTimeTaken = (printerStatsForPageTotalAndPrinter.totalTimeTaken || 0) + el.timeTaken;
+          let newState = {};
+          const nestLevel1 = resultMap[el.printerName] || {};
+          const nestLevel2 = nestLevel1[el.totalPages] || {};
+          newState = {
+            ...resultMap,
+            [el.printerName]: {
+              ...nestLevel1,
+              [el.totalPages]: {
+                ...nestLevel2,
+                pageCount: currentPageCount,
+                totalPages: totalPages,
+                totalTimeTaken,
+                averageTimeTaken: newComputedAverage,
+                count: counterToUse,
+                displayName: el.displayName
+              }
+            }
+          };
+          resultMap = newState;
+
+        });
+      console.log(JSON.stringify(resultMap, null, 2))
+      // console.log("reuslt:", resultMap)
+
+    })
   }
 
-  onChange(event: ChangeEvent<HTMLInputElement>) {
+  onChangeHandler(event: ChangeEvent<HTMLInputElement>) {
+    event.preventDefault();
+    const currentValue = event.target.value;
+    const name = event.target.name as keyof AppState;
     this.setState({
-      url: event.target.value
+      ...this.state,
+      [name]: currentValue
     })
   }
   render() {
@@ -71,11 +136,13 @@ export default class App extends React.Component<AppProps, AppState> {
           <p>
             Edit <code>src/App.tsx</code> and save to reload.
           </p>
-          <input type="text" value={this.state.url} onChange={this.onChange} />
-          <button onClick={this.onPlayHandler} >
-            Play Video
-          </button>
-          <label>{this.state.url}</label>
+          <FormField name="tenantId" label="Tenant Name:" value={this.state.tenantId}
+            onChangeHandler={this.onChangeHandler} />
+          <FormField name="tekionApiToken" label="TekionApiToken:" value={this.state.tekionApiToken}
+            onChangeHandler={this.onChangeHandler} />
+          <FormField name="dealerId" label="DealerId:" value={this.state.dealerId}
+            onChangeHandler={this.onChangeHandler} />
+          <button onClick={this.onClickHandler}>Make Api Call</button>
           <a
             className="App-link"
             href="https://reactjs.org"
@@ -83,9 +150,7 @@ export default class App extends React.Component<AppProps, AppState> {
             rel="noopener noreferrer"
           >
             Learn React
-            <video id="videotest">
 
-            </video>
 
           </a>
 
