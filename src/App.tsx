@@ -27,6 +27,8 @@ interface AppState {
   tenantId: string,
   tekionApiToken: string,
   dealerId: string,
+  filePath:string,
+  uploadurl:string,
 
 }
 export default class App extends React.Component<AppProps, AppState> {
@@ -35,10 +37,13 @@ export default class App extends React.Component<AppProps, AppState> {
     this.state = {
       tenantId: "",
       dealerId: "",
-      tekionApiToken: ""
+      tekionApiToken: "",
+      filePath:"",
+      uploadurl:""
     };
     this.onClickHandler = this.onClickHandler.bind(this);
     this.onChangeHandler = this.onChangeHandler.bind(this);
+    this.onFileHandler = this.onFileHandler.bind(this);
   }
   componentDidMount() { }
 
@@ -48,75 +53,31 @@ export default class App extends React.Component<AppProps, AppState> {
 
   onClickHandler(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    const isDealerId = this.state.dealerId;
-    const searchRequest: SearchRequestType = {
-      filters: [{ "field": "tenantId", "operator": RequestOperator.IN, "values": [this.state.tenantId] },
-       {
-        "field": "dealerId", operator: RequestOperator.IN, values: [this.state.dealerId]
-      }],
-      pageInfo: {
-        start: 0,
-        rows: 200
-      }
-    };
-    const responsePromise = axios.post("https://app.tekioncloud.com/api/printer-mgmt/u/print-jobs/v2/search", searchRequest,
-      {
-        headers: {
-          "tekion-api-token": this.state.tekionApiToken ,
-          "dealerId": "4",
-          "tenantName": "techmotors",
-          "roleId": "4_SuperAdmin",
-          "clientId": "console",
-          "userId": "-1"
-        }
-      }
-    );
-    // const searchResponse:TekionResponseType<SearchResponseType<PrintJobSearchResponeType>> =
-    responsePromise.then((res: AxiosResponse<TekionResponseType<PrinterSeachResponseType<PrintJobSearchResponeType>>, any>) => {
-      const hits = res.data.data.hits;
-      console.log("result from " + res.data.data.extra);
-      let resultMap: {
-        [key: string]: PrinterStatsTypeByPageCount
-      } = {};
-      hits.filter(el => el.status === "COMPLETED")
-        .forEach((el: PrintJobSearchResponeType, index: number) => {
-          const currentPrintTimeTaken = el.timeTaken;
-          const currentPageCount = el.totalPages;
-          const currentSinglePagePrintAverage = currentPrintTimeTaken / currentPageCount;
-          const printerStats = resultMap[el.printerName] || {};
-          const printerStatsForPageTotalAndPrinter = printerStats[el.totalPages] || {};
-          const computedOverallAverageForPageAndPrinter = printerStatsForPageTotalAndPrinter.averageTimeTaken || 0;
-          const sumOfAverage = currentSinglePagePrintAverage + computedOverallAverageForPageAndPrinter;
-          const currentCounter = printerStatsForPageTotalAndPrinter.count || 0;
-          const counterToUse = currentCounter + 1;
-          const newComputedAverage = sumOfAverage / counterToUse;
-          const totalPages = (printerStatsForPageTotalAndPrinter.totalPages || 0) + el.totalPages;
-          const totalTimeTaken = (printerStatsForPageTotalAndPrinter.totalTimeTaken || 0) + el.timeTaken;
-          let newState = {};
-          const nestLevel1 = resultMap[el.printerName] || {};
-          const nestLevel2 = nestLevel1[el.totalPages] || {};
-          newState = {
-            ...resultMap,
-            [el.printerName]: {
-              ...nestLevel1,
-              [el.totalPages]: {
-                ...nestLevel2,
-                pageCount: currentPageCount,
-                totalPages: totalPages,
-                totalTimeTaken,
-                averageTimeTaken: newComputedAverage,
-                count: counterToUse,
-                displayName: el.displayName
-              }
-            }
-          };
-          resultMap = newState;
+    const fileSelect = document.getElementById("filePath") as HTMLInputElement;
+    let file:File | null = null;
+    if(fileSelect.files && fileSelect.files.length ===1){
+      file= fileSelect.files.item(0);
+      const fileNotNull:File = file as File;
+      fileNotNull.arrayBuffer()
+      .then(value=>{
+        axios.put(this.state.uploadurl,value,{headers:{
+          "content-type":"video/mp4"
+        }}).then((res: AxiosResponse<any, any>) => {
+      console.log("upload done",res.status)
+        }).catch(error=>console.log(error))
+      }).catch(error=>console.log(error))
+    
+    }
+  }
 
-        });
-      console.log(JSON.stringify(resultMap, null, 2))
-      // console.log("reuslt:", resultMap)
-
-    })
+  onFileHandler(event:ChangeEvent<HTMLInputElement>){
+event.preventDefault();
+const name = event.target.name as keyof AppState;
+const filePath=event.target.value;
+this.setState({
+  ...this.state,
+  [name]: filePath
+});
   }
 
   onChangeHandler(event: ChangeEvent<HTMLInputElement>) {
@@ -136,12 +97,11 @@ export default class App extends React.Component<AppProps, AppState> {
           <p>
             Edit <code>src/App.tsx</code> and save to reload.
           </p>
-          <FormField name="tenantId" label="Tenant Name:" value={this.state.tenantId}
+          <FormField name="uploadurl" label="Tenant Name:" value={this.state.uploadurl}
             onChangeHandler={this.onChangeHandler} />
-          <FormField name="tekionApiToken" label="TekionApiToken:" value={this.state.tekionApiToken}
-            onChangeHandler={this.onChangeHandler} />
-          <FormField name="dealerId" label="DealerId:" value={this.state.dealerId}
-            onChangeHandler={this.onChangeHandler} />
+         
+               <input type="file"
+       id="filePath" name="filePath" onChange={this.onFileHandler}></input>
           <button onClick={this.onClickHandler}>Make Api Call</button>
           <a
             className="App-link"
